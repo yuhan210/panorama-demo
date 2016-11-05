@@ -6,7 +6,7 @@ import math
 import datetime
 import logging
 import flask
-from flask.ext.cors import CORS
+from flask_cors import CORS
 import operator
 import inflection
 import werkzeug
@@ -14,7 +14,7 @@ import optparse
 import tornado.wsgi
 import tornado.httpserver
 import numpy as np
-from utils import *
+#from utils import *
 
 VIDEOS = open('video_list.txt').read().split()
 TOPK = 6
@@ -182,11 +182,6 @@ def init():
     global stream_rates
     global start_fid_set
     global stream_framenum
-    global blocking_videos
-    
-    blocking_videos = []
-    for video_name in open('blocking_videos').read().split():
-	     blocking_videos += [video_name]
 
     with open('stream_rates.pickle') as fh:
         data = pickle.load(fh)

@@ -25,7 +25,7 @@ function setPageFormat(){
 
 
 function getVideoURL(video_name, start_time, end_time) {
-        return server_url + '/panorama-engine/videos/' + video_name + '.mp4#t=' + start_time
+        return server_url + '/panorama-demo/videos/' + video_name + '.mp4#t=' + start_time
 }
 
 
