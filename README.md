@@ -2,7 +2,7 @@
 http://elmo.csail.mit.edu/panorama-demo/
 
 # Run server
-1. sudo pip install -r requirements.txz
+1. sudo pip install -r requirements.txt
 2. Open port 5000
 
 # Run web interface
