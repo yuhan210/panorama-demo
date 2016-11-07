@@ -4,6 +4,7 @@ import pickle
 import json
 import math
 import datetime
+import redis
 import logging
 import flask
 from flask_cors import CORS
@@ -14,8 +15,8 @@ import optparse
 import tornado.wsgi
 import tornado.httpserver
 import numpy as np
+import heapq
 
-VIDEOS = open('video_list.txt').read().split()
 TOPK = 6
 SERVER_STORAGE_FRAMES = 5 * 30
 
@@ -40,9 +41,9 @@ def search():
 @app.route('/redis-search', methods=['GET'])
 def redis_search():
     query_str = flask.request.args.get('query','')
+    logging.info('Query: %s', query_str)
     cur_ts = time.time()
     app.search_handler.search(cur_ts)
-    logging.info('Query: %s', query_str)
         
 
 def get_videoseg_name(video_name, fid):
@@ -61,8 +62,6 @@ def get_videoseg_name(video_name, fid):
 def compose_response(rand_idx, opt_text_vis_ranks, opt_text_ranks, meta_ranks):
 
     response_dict = {}
-
-    
     response_dict['opt_text_vis'] = {}
     for idx, tup in enumerate(opt_text_vis_ranks):
 
@@ -109,10 +108,89 @@ def index():
 class SearchHandler:
     def __init__(self): 
         self.start_ts = time.time()
+        self._redis = redis.StrictRedis()
 
-    def search(cur_ts):
-                
-  
+        with open('../data/video_list.txt') as fh:
+            self.video_names = fh.read().split()
+        with open('../data/stream_rates.pickle') as fh:
+            self.video_frame_rate = pickle.load(fh)
+        with open('../data/video_frame_num.pickle') as fh:
+            self.video_length_in_frames = pickle.load(fh)
+
+        self.video_length_in_secs = {}
+        for video_name in self.video_names:
+            self.video_length_in_secs[video_name] = self.video_length_in_frames/int(round(self.video_frame_rate[video_name][0]))
+
+    def get_matching_prec(self, obj_tags, query_list):
+        # compute consine similarity (a dot b/ ||a|| * ||b||)
+        num_matching_query = 0
+        for query in query_list:
+            if query in obj_tags:
+                num_matching_query += 1
+
+        return num_matching_query/float(len(obj_tags))
+
+    def get_vis_score(self, query, vis_features):
+        MS_W = -0.3
+        DT_W = 0.5
+        SIZE_W = 0.5 
+
+        score = MS_W * vis_features['moving_speed'] + DT_W * vis_features['dwell_time'] + SIZE_W * vis_features['size']
+        return score
+
+    def get_relevance_score(self, query_list, feature_dict):
+        obj_tags = feature_dict['obj_tags']   
+        vis_features = feature_dict['obj_vis_features']
+        
+        # text score
+        text_score = self.get_matching_prec(obj_tags, query_list) 
+
+        # vis score
+        query_score = {}
+        for query in query_list:  
+            if query in vis_features:
+                vis_score = self.get_vis_score(query, vis_features[query])
+                query_score[query] = vis_score
+            else:
+                query_score[query] = 0
+
+        final_score = text_score + max([query_score[x] for x in query_score])
+        return final_score
+
+    def sort_streams(self, ts, query_list, relevant_streams):
+        # sid to video_name
+        stream_heap = []
+        for vid in relevant_streams:
+            feature_table_key = str(ts)  + ':' + str(vid)
+            feature_pickle = self._redis.get(feature_table_key) 
+            feature_dict = pickle.loads(feature_pickle)
+            score = self.get_relevance_score(query_list, feature_dict)
+            heapq.heappush(stream_heap, (score * (-1.0), vid))
+
+        return stream_heap 
+
+    def get_unmatched_streams(self, ts, relevant_vids):
+        for vid, video_name in enumerate(self.video_names):
+
+    def search(self, query, cur_ts):
+        ts = int((cur_ts - self.start_ts) % 200.)
+        query_list = query.split(' ')
+        reverse_table_keys = [str(ts) + ':' + str(query) for query in query_list]
+        relevant_sids = self._redis.sunion(reverse_table_keys)
+
+        relevant_videos = []
+        if len(list(relevant_sids)) > 0:
+            stream_heap_rank = self.sort_streams(list(relevant_sids))
+            
+            for rank in xrange(TOPK):
+                vid = stream_heap_rank[rank][1]
+                score = stream_heap_rank[rank][1]
+                video_name = self.video_names[vid]
+                relevant_videos += [{'video_name': video_name, 'start': ts - 5, 'end': ts, 'score' : (-1) * score,'delay': random.randint(0, 5)}] 
+
+        unmatched_videos = self.get_unmatched_streams(ts, list(relevant_sids))  
+        return {'relevant': relevant_videos, 'irrelevant': unmatched_videos} 
+ 
 class SearchObject:
 
   def __init__(self):

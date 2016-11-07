@@ -209,10 +209,10 @@ if __name__ == "__main__":
     print p
     vid = [2,3,5]
     _redis.sadd(key, *vid)
-    p = _redis.smembers(key)
+    p = _redis.smembers("123-cat")
     print p
+    exit()
     '''
-
     for vid, video_name in enumerate(video_names):
         print vid, video_name
 
