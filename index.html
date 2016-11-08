@@ -3,26 +3,21 @@
 <head>
 <style type='text/css'>
 
-table.choiceTable {
-	border:2px solid black; 
-	border-collapse: collapse;
-	
+#panorama{
+    font-size: 50px;
+    font-family: Arial, Helvetica, sans-serif;
+    font-weight: bold;
 }
 
-table.choiceTable tr.odd {
-	background: #F2F2F2;
-
-}
-table.choiceTable tr.even {
-	background: white; 
-}
-table.choiceTable td {
-	border: 2px;
-	border-bottom:2px solid #000;
-	border-top:1px solid #000;
+#matched_video_region{
+    background-color:LightCoral;
+    margin: 0 auto;
+    padding: 0;
 }
 
-
+#unmatched_video_region{
+   background-color:lavenderblush; 
+}
 
 </style>
 <script type="text/javascript" src='./js/jquery-1.11.3.js'></script>
@@ -34,18 +29,18 @@ table.choiceTable td {
 <!--<body id="body" style="visibilitydden;" onload="javascript:StartAMT();"> --!>
 <body id="body" onload="javascript:StartPanorama();">
 
-    <div id="panorama"><font size = 30> <b>Panorama</b> </font></div>
+    <div id="panorama">Panorama</div>
     <input type="search" id="searchbox" size="80" height="20" style="font-size:20px" placeholder="Search live streams (e.g., guitar, beach, snow, cat, car, basketball)">	
     <button style="font-size:20px" onclick="doSearch()"> Search </button>
     <button style="font-size:20px" onClick="reset()"> Reset </button>
-	  <!--<div id="loading" style="font-size:20px">Loading image...</div> --!>
-
+	<!--<div id="loading" style="font-size:20px">Loading image...</div> --!>
+     
 	<div id="main_canvas" class="top" style="overflow:auto;">
-
-
-	</div>
-
-	
+        <div id = "loading"> Searching live streams... </div>
+        <div id = "preview_video_region"> </div>
+        <div id = "matched_video_region"> </div>
+        <div id = "unmatched_video_region"> </div>
+    </div>
 
 </body>
 

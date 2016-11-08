@@ -2,6 +2,7 @@ import os
 import time
 import pickle
 import json
+import random
 import math
 import datetime
 import redis
@@ -17,9 +18,12 @@ import tornado.httpserver
 import numpy as np
 import heapq
 
-TOPK = 6
+TOPK = 20
+NUM_UNMATCHED_VIDEOS = 30
 SERVER_STORAGE_FRAMES = 5 * 30
+SERVER_DELAY_SECS = 5
 
+random.seed(0)
 # Obtain the flask app object
 app = flask.Flask(__name__)
 CORS(app)
@@ -41,10 +45,14 @@ def search():
 @app.route('/redis-search', methods=['GET'])
 def redis_search():
     query_str = flask.request.args.get('query','')
+    option = flask.request.args.get('option', 'Default')
     logging.info('Query: %s', query_str)
     cur_ts = time.time()
-    app.search_handler.search(cur_ts)
-        
+    search_results = app.search_handler.search(query_str, cur_ts, option)
+    print search_results 
+
+    
+    return flask.jsonify(success = True, response = search_results) 
 
 def get_videoseg_name(video_name, fid):
 
@@ -107,7 +115,7 @@ def index():
 
 class SearchHandler:
     def __init__(self): 
-        self.start_ts = time.time()
+        self.start_ts = time.time() - 10
         self._redis = redis.StrictRedis()
 
         with open('../data/video_list.txt') as fh:
@@ -119,26 +127,30 @@ class SearchHandler:
 
         self.video_length_in_secs = {}
         for video_name in self.video_names:
-            self.video_length_in_secs[video_name] = self.video_length_in_frames/int(round(self.video_frame_rate[video_name][0]))
+            self.video_length_in_secs[video_name] = self.video_length_in_frames[video_name]/int(round(self.video_frame_rate[video_name][0]))
 
     def get_matching_prec(self, obj_tags, query_list):
-        # compute consine similarity (a dot b/ ||a|| * ||b||)
         num_matching_query = 0
         for query in query_list:
             if query in obj_tags:
                 num_matching_query += 1
 
-        return num_matching_query/float(len(obj_tags))
+        return num_matching_query/float(len(query_list))
 
-    def get_vis_score(self, query, vis_features):
-        MS_W = -0.3
+    def get_vis_score(self, query, vis_features, video_name):
+
+        MS_W = -0.4
         DT_W = 0.5
-        SIZE_W = 0.5 
-
-        score = MS_W * vis_features['moving_speed'] + DT_W * vis_features['dwell_time'] + SIZE_W * vis_features['size']
+        SIZE_W = 0.8
+        vis_features['dwell_time'] /= (self.video_frame_rate[video_name][0] * 5) 
+        print vis_features
+        
+        score = MS_W * vis_features['moving_speed'] + DT_W * vis_features['dwell_time']/ + SIZE_W * vis_features['size']
+        if math.isnan(score): 
+            return 0
         return score
 
-    def get_relevance_score(self, query_list, feature_dict):
+    def get_relevance_score(self, query_list, feature_dict, video_name):
         obj_tags = feature_dict['obj_tags']   
         vis_features = feature_dict['obj_vis_features']
         
@@ -149,46 +161,97 @@ class SearchHandler:
         query_score = {}
         for query in query_list:  
             if query in vis_features:
-                vis_score = self.get_vis_score(query, vis_features[query])
+                vis_score = self.get_vis_score(query, vis_features[query], video_name)
                 query_score[query] = vis_score
             else:
                 query_score[query] = 0
+          
+        print 'query_score:', query_score, 'text:', text_score
+        final_score = 0.5 * text_score + 0.5 * max([query_score[x] for x in query_score])
 
-        final_score = text_score + max([query_score[x] for x in query_score])
+        check_ws = ['bear', 'goat', 'sheep', 'tiger', 'dog', 'cat']
+        for w in check_ws:
+            if video_name.find(w) >= 0 and w not in query_list:   
+                final_score = 0 
+             
         return final_score
 
     def sort_streams(self, ts, query_list, relevant_streams):
         # sid to video_name
-        stream_heap = []
+        stream_scores = {}
         for vid in relevant_streams:
             feature_table_key = str(ts)  + ':' + str(vid)
             feature_pickle = self._redis.get(feature_table_key) 
             feature_dict = pickle.loads(feature_pickle)
-            score = self.get_relevance_score(query_list, feature_dict)
-            heapq.heappush(stream_heap, (score * (-1.0), vid))
+            score = self.get_relevance_score(query_list, feature_dict, self.video_names[int(vid)])
+            stream_scores[self.video_names[int(vid)]] = score
+        return sorted(stream_scores.items(), key=lambda x: x[1], reverse = True)
 
-        return stream_heap 
+    def get_unmatched_videos(self, ts, relevant_vids, unmatched_k = NUM_UNMATCHED_VIDEOS):
+        unmatched_videos = []
+        n = 0
+        for sid, video_name in enumerate(self.video_names):
+            remaining_time = self.video_length_in_secs[video_name] - ts
+            if remaining_time > SERVER_DELAY_SECS and sid not in relevant_vids:            
+                # Reservoir sampling
+                n += 1    
+                num_selected = len(unmatched_videos) 
+                if num_selected < unmatched_k:
+                    unmatched_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score': 0,'delay': 0}] 
+                else:
+                    r = int(random.random() * n)
+                    if r < unmatched_k:
+                        unmatched_videos[r] = {'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score': 0,'delay': 0}
+        return unmatched_videos
 
-    def get_unmatched_streams(self, ts, relevant_vids):
-        for vid, video_name in enumerate(self.video_names):
+    def search(self, query, cur_ts, option = 'Default'):
 
-    def search(self, query, cur_ts):
         ts = int((cur_ts - self.start_ts) % 200.)
         query_list = query.split(' ')
         reverse_table_keys = [str(ts) + ':' + str(query) for query in query_list]
         relevant_sids = self._redis.sunion(reverse_table_keys)
+        num_relevant_streams = len(list(relevant_sids))
 
-        relevant_videos = []
-        if len(list(relevant_sids)) > 0:
-            stream_heap_rank = self.sort_streams(list(relevant_sids))
-            
-            for rank in xrange(TOPK):
-                vid = stream_heap_rank[rank][1]
-                score = stream_heap_rank[rank][1]
-                video_name = self.video_names[vid]
-                relevant_videos += [{'video_name': video_name, 'start': ts - 5, 'end': ts, 'score' : (-1) * score,'delay': random.randint(0, 5)}] 
+        if option == 'Length':
 
-        unmatched_videos = self.get_unmatched_streams(ts, list(relevant_sids))  
+            relevant_videos = [] 
+            if num_relevant_streams > 0:
+                video_name_length = {} 
+                for sid in list(relevant_sids):
+                    video_name = self.video_names[int(sid)]
+                    video_name_length[video_name] = self.video_length_in_secs[video_name]
+
+                video_name_length = sorted(video_name_length.items(), key=lambda x: x[1])
+                for i in xrange(min(TOPK, num_relevant_streams)):
+                    relevant_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0}] 
+
+            unmatched_videos = []
+            video_name_length = {}
+            for sid, video_name in enumerate(self.video_names):
+                if sid not in list(relevant_sids):
+                    video_name = self.video_names[sid]
+                    video_name_length[video_name] = self.video_length_in_secs[video_name]
+        
+            video_name_length = sorted(video_name_length.items(), key=lambda x: x[1])
+            for i in xrange(min(NUM_UNMATCHED_VIDEOS, len(video_name_length))):
+                    unmatched_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0}] 
+             
+        elif option == 'Default':
+        
+            relevant_videos = []
+            if num_relevant_streams > 0:
+                stream_scores = self.sort_streams(ts, query_list, list(relevant_sids))
+
+                print stream_scores 
+                # randomly select TOPK streams
+                for i in xrange(min(TOPK, num_relevant_streams)):
+                    score = stream_scores[i][1]
+                    video_name = stream_scores[i][0]
+                    #relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : (-1) * score,'delay': random.randint(0, 5)}] 
+                    relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : score,'delay': 0}] 
+
+            unmatched_videos = self.get_unmatched_videos(ts, list(relevant_sids))  
+
         return {'relevant': relevant_videos, 'irrelevant': unmatched_videos} 
  
 class SearchObject:
@@ -209,7 +272,6 @@ class SearchObject:
       irrelevant_videos = irrelevant_videos[: min(TOPK, len(irrelevant_videos))]
       match_videos =  [x for x in sorted_index if x[1]['score'] > 0.2 and x[0].find('capital_cities__kangaroo_court_forever_kid_remix_p_Xv0mmPZJE') < 0 and x[0].find('adorable_baby_lambs_5EbATpgZEMw') < 0]
       # select topk video for streaming
-      import random
       random.seed(0)
       relevant_videos = match_videos[:TOPK]
       #relevant_videos = random.sample(match_videos[2:], min(max(0, TOPK - 2), len(match_videos[2:])))

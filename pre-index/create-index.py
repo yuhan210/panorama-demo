@@ -175,16 +175,17 @@ def normalize_objtags(msr, vgg, rcnn, start_fid, end_fid, OCCUR_PERC = 0.3):
 
 def create_feature_index(vid, video_name, msr, vgg, rcnn, video_len):
     fps = int(round(video_frame_rate[video_name][0]))
-    WINDOW_STEP = 1 * fps
-    WINDOW_SIZE = 5 * fps
     width = video_frame_rate[video_name][1]    
     height = video_frame_rate[video_name][2] 
+    WINDOW_STEP_IN_SEC = 1
+    WINDOW_SIZE_IN_SEC = 5
+    video_len_in_sec = video_lengths[video_name]/fps
 
-    end_fid = WINDOW_SIZE
-    ts = 5
-    while end_fid < video_len:
-        start_fid = end_fid - WINDOW_SIZE 
-        print start_fid, end_fid
+    ts = WINDOW_SIZE_IN_SEC
+    end_fid = ts * fps
+    while end_fid <= video_len:
+        start_fid = end_fid - WINDOW_SIZE_IN_SEC * fps
+        print ts, start_fid, end_fid, fps, video_len, video_len_in_sec
         obj_tags, obj_vis_features = get_features(msr, vgg, rcnn, start_fid, end_fid, width, height, fps)
         # feature table
         redis_feature_value = {'obj_tags': obj_tags, 'obj_vis_features': obj_vis_features}   
@@ -196,9 +197,10 @@ def create_feature_index(vid, video_name, msr, vgg, rcnn, video_len):
             redis_reverse_key = str(ts) + ':' + str(tag)
             _redis.sadd(redis_reverse_key, vid)
 
-        end_fid += WINDOW_STEP 
-        ts += 1
-
+        ts += WINDOW_STEP_IN_SEC
+        end_fid = ts * fps
+    #ts = ts - WINDOW_STEP_IN_SEC
+    #assert(video_len_in_sec == ts)
 
 if __name__ == "__main__":
     '''
@@ -214,6 +216,8 @@ if __name__ == "__main__":
     exit()
     '''
     for vid, video_name in enumerate(video_names):
+        if vid < 274:
+            continue
         print vid, video_name
 
         video_len = video_lengths[video_name]
