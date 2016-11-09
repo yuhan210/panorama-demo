@@ -172,7 +172,8 @@ function showVideos(query_str, relevant_dict, irrelevant_dict) {
     }
     for (i = 0;  i < relevant_video_num ; ++i) {
 
-        html_str  += '<div id="relevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="relevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="relevant_finished_loading(' + i + ',' + relevant_video_num  + ', \'' + query_str +  '\')"  onmouseover="playRelevantVideo(' + i + ')"  onmouseout="pauseRelevantVideo(' + i + ')"> <source src ="' + getVideoURL(relevant_dict[i]['video_name'], relevant_dict[i]['start'], relevant_dict[i]['end']) + '" type="video/mp4"></video> </div>';
+        //html_str  += '<div id="relevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="relevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="relevant_finished_loading(' + i + ',' + relevant_video_num  + ', \'' + query_str +  '\')"  onmouseover="playRelevantVideo(' + i + ')"  onmouseout="pauseRelevantVideo(' + i + ')"> <source src ="' + getVideoURL(relevant_dict[i]['video_name'], relevant_dict[i]['start'], relevant_dict[i]['end']) + '" type="video/mp4"></video> </div>';
+        html_str  += '<div id="relevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="relevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="relevant_finished_loading(' + i + ',' + relevant_video_num  + ', \'' + query_str +  '\')"  onmouseover="playRelevantVideo(' + i + ')"  onmouseout="pauseRelevantVideo(' + i + ')"> <source src ="' + relevant_dict[i]['video_url'] + '" type="video/mp4"></video> </div>';
     } 
 
 	$('#matched_video_region').html(html_str);

@@ -22,6 +22,9 @@ TOPK = 20
 NUM_UNMATCHED_VIDEOS = 30
 SERVER_STORAGE_FRAMES = 5 * 30
 SERVER_DELAY_SECS = 5
+SNIPPET_FOLDER = '/var/www/html/panorama-demo/video-snippets'
+SERVER_URL = 'http://ec2-54-87-87-35.compute-1.amazonaws.com'
+ELMO_URL  = "http://elmo.csail.mit.edu"
 
 random.seed(0)
 # Obtain the flask app object
@@ -167,7 +170,7 @@ class SearchHandler:
                 query_score[query] = 0
           
         print 'query_score:', query_score, 'text:', text_score
-        final_score = 0.5 * text_score + 0.5 * max([query_score[x] for x in query_score])
+        final_score = 0.7 * text_score + 0.3 * max([query_score[x] for x in query_score])
 
         check_ws = ['bear', 'goat', 'sheep', 'tiger', 'dog', 'cat']
         for w in check_ws:
@@ -210,12 +213,22 @@ class SearchHandler:
         ts = int((cur_ts - self.start_ts) % 200.)/5 * 5
 
         ##
-        if "dog" in query_list:
+        if "dog" in query_list and "beach" in query_list:
+            ts = 20
+        elif "dog" in query_list and "snow" in query_list:
+            ts = 20
+        elif "car" in query_list and "person" in query_list:
+            ts = 15
+        elif "car" in query_list and "street" in query_list:
+            ts = 25
+        elif "car" in query_list:
+            ts = 75
+        elif "dog" in query_list:
             ts = 30
         elif "guitar" in query_list:
             ts = 40
         elif "turtle" in query_list:
-            ts = 70
+            ts = 75
         elif "ski" in query_list:
             ts = 85
         elif "beach" in query_list:
@@ -225,11 +238,10 @@ class SearchHandler:
         elif "sofa" in query_list:
             ts = 180
         elif "basketball" in query_list:
-            ts = 190
+            ts = 195
         ## 
 
              
-        query_list = query.split(' ')
         reverse_table_keys = [str(ts) + ':' + str(query) for query in query_list]
         relevant_sids = self._redis.sunion(reverse_table_keys)
         num_relevant_streams = len(list(relevant_sids))
@@ -245,7 +257,15 @@ class SearchHandler:
 
                 video_name_length = sorted(video_name_length.items(), key=lambda x: x[1])
                 for i in xrange(min(TOPK, num_relevant_streams)):
-                    relevant_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0}] 
+                    snippet_filename =  video_name_length[i][0] + '_' + str(ts-SERVER_DELAY_SECS) + '.mp4'
+                    snippet_path = os.path.join(SNIPPET_FOLDER, snippet_filename)  
+ 
+                    if os.path.exists(snippet_path):
+                        video_url = SERVER_URL + '/panorama-demo/video-snippets/' + snippet_filename 
+                    else:
+                        video_url = ELMO_URL + '/panorama-demo/videos/' + video_name_length[i][0] + '.mp4#t=' + str(ts-SERVER_DELAY_SECS)
+
+                    relevant_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0, 'video_url':video_url}] 
 
             unmatched_videos = []
             video_name_length = {}
@@ -256,7 +276,15 @@ class SearchHandler:
         
             video_name_length = sorted(video_name_length.items(), key=lambda x: x[1])
             for i in xrange(min(NUM_UNMATCHED_VIDEOS, len(video_name_length))):
-                    unmatched_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0}] 
+                    snippet_filename =  video_name_length[i][0] + '_' + str(ts-SERVER_DELAY_SECS) + '.mp4'
+                    snippet_path = os.path.join(SNIPPET_FOLDER, snippet_filename)  
+ 
+                    if os.path.exists(snippet_path):
+                        video_url = SERVER_URL + '/panorama-demo/video-snippets/' + snippet_filename 
+                    else:
+                        video_url = ELMO_URL + '/panorama-demo/videos/' + video_name_length[i][0] + '.mp4#t=' + str(ts-SERVER_DELAY_SECS)
+
+                    unmatched_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0, 'video_url': video_url}] 
              
         elif option == 'Default':
         
@@ -269,8 +297,16 @@ class SearchHandler:
                 for i in xrange(min(TOPK, num_relevant_streams)):
                     score = stream_scores[i][1]
                     video_name = stream_scores[i][0]
+
+                    snippet_filename =  video_name + '_' + str(ts-SERVER_DELAY_SECS) + '.mp4'
+                    snippet_path = os.path.join(SNIPPET_FOLDER, snippet_filename)  
+ 
+                    if os.path.exists(snippet_path):
+                        video_url = SERVER_URL + '/panorama-demo/video-snippets/' + snippet_filename 
+                    else:
+                        video_url = ELMO_URL + '/panorama-demo/videos/' + video_name + '.mp4#t=' + str(ts-SERVER_DELAY_SECS)
                     #relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : (-1) * score,'delay': random.randint(0, 5)}] 
-                    relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : score,'delay': 0}] 
+                    relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : score,'delay': 0, 'video_url':video_url}] 
 
             unmatched_videos = []
             video_name_length = {}
@@ -281,7 +317,14 @@ class SearchHandler:
         
             video_name_length = sorted(video_name_length.items(), key=lambda x: x[1])[3:]
             for i in xrange(min(NUM_UNMATCHED_VIDEOS, len(video_name_length))):
-                    unmatched_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0}] 
+                    snippet_filename =  video_name_length[i][0] + '_' + str(ts-SERVER_DELAY_SECS) + '.mp4'
+                    snippet_path = os.path.join(SNIPPET_FOLDER, snippet_filename)  
+ 
+                    if os.path.exists(snippet_path):
+                        video_url = SERVER_URL + '/panorama-demo/video-snippets/' + snippet_filename 
+                    else:
+                        video_url = ELMO_URL + '/panorama-demo/videos/' + video_name_length[i][0] + '.mp4#t=' + str(ts-SERVER_DELAY_SECS)
+                    unmatched_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0, 'video_url': video_url}] 
              
             #unmatched_videos = self.get_unmatched_videos(ts, list(relevant_sids))  
 
@@ -364,6 +407,20 @@ def start_from_terminal(app):
         start_tornado(app, opts.port)
 
 
+def get_shortened_video():  
+    queries = ['dog beach','dog snow', 'car person', 'car street', 'car', 'dog', 'guitar', 'turtle', 'ski', 'beach', 'person', 'sofa']  
+    h = SearchHandler()
+    fh = open('log', 'w')
+    for query in queries:
+        h = SearchHandler()
+        results = h.search(query, 123)
+        for rank, x in enumerate(results['relevant']):
+            if rank == 10:
+                break
+
+            fh.write(x['video_name'] + ' ' + str(x['start']) + '\n')
+    fh.close()
+
 def init():
     
     global stream_rates
@@ -384,3 +441,4 @@ if __name__ == '__main__':
     init()
     logging.getLogger().setLevel(logging.INFO)
     start_from_terminal(app)
+    #get_shortened_video()
