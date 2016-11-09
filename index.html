@@ -1,23 +1,72 @@
-<!-- This file needs to be hosted on an external server.  -->
 <html>
 <head>
 <style type='text/css'>
+a:link {
+    color: black;
+    text-decoration: none;
+}
+
+/* visited link */
+a:visited {
+    color: black;
+    text-decoration: none;
+}
+#search_result_region {
+    position:absolute;
+    top: 170px;
+    left: 3%;
+}
 
 #panorama{
-    font-size: 50px;
-    font-family: Arial, Helvetica, sans-serif;
+    background-color: darkgray;
+    width: 100%;
+    padding: 10px 0px 5px 0px; 
+    text-align: center;
+    font-size: 60px;
+    font-family: Lucida Grande;
     font-weight: bold;
+    height: 80px;
 }
 
-#matched_video_region{
-    background-color:LightCoral;
-    margin: 0 auto;
-    padding: 0;
+#matched_video_text_region{
+    position: absolute;
+    padding: 10px 5px 5px 5px; 
+    left: 4.5%;
+    top: 150px;
+    font-size: 26px;
+    border-radius: 13px; 
+    height:40px;
+    color:black;
+    background-color: lightgray;
+    font-family: Lucida Grande;
+    visibility: hidden;
+    z-index: 9999;
 }
 
-#unmatched_video_region{
-   background-color:lavenderblush; 
+
+#unmatched_video_text_region{
+    position: absolute;
+    padding: 10px 5px 5px 5px; 
+    left: 52.5%;
+    top: 150px;
+    font-size: 26px;
+    border-radius: 13px; 
+    height:40px;
+    color:black;
+    background-color: lightgray;
+    font-family: Lucida Grande;
+    visibility: hidden;
+    z-index: 9999;
 }
+
+
+#search_region{
+    height: 40px;
+    background-color: darkgray;
+    text-align: center;
+    font-family: Lucida Grande;
+}
+
 
 </style>
 <script type="text/javascript" src='./js/jquery-1.11.3.js'></script>
@@ -26,20 +75,23 @@
 <script type="text/javascript" src='./js/startup.js'></script>
 </head>
 
-<!--<body id="body" style="visibilitydden;" onload="javascript:StartAMT();"> --!>
 <body id="body" onload="javascript:StartPanorama();">
 
-    <div id="panorama">Panorama</div>
-    <input type="search" id="searchbox" size="80" height="20" style="font-size:20px" placeholder="Search live streams (e.g., guitar, beach, snow, cat, car, basketball)">	
-    <button style="font-size:20px" onclick="doSearch()"> Search </button>
-    <button style="font-size:20px" onClick="reset()"> Reset </button>
+    <div id="panorama"> <a href="index.html">Panorama</a></div>
+    <div id="search_region">
+        <input type="search" id="searchbox" size="80" height="20" style="font-size:20px" placeholder="Search live streams (e.g., dog, guitar, turtle, beach, person, sofa)" onkeydown="if (event.keyCode == 13) document.getElementById('btnSearch').click()" />	
+        <button id="btnSearch" style="font-size:20px" onclick="doSearch()"> Search </button>
 	<!--<div id="loading" style="font-size:20px">Loading image...</div> --!>
-     
+     </div>
 	<div id="main_canvas" class="top" style="overflow:auto;">
         <div id = "loading"> Searching live streams... </div>
-        <div id = "preview_video_region"> </div>
-        <div id = "matched_video_region"> </div>
-        <div id = "unmatched_video_region"> </div>
+        <div id = "preview_video_region" style="width=80%"> </div>
+        <div id = "matched_video_text_region" style="visibility:hidden;"> </div>
+        <div id = "unmatched_video_text_region" style="visibility:hidden;"> </div>
+        <div id = "search_result_region">
+            <div id = "matched_video_region" style="float:left; visibility:hidden;"> </div>
+            <div id = "unmatched_video_region" style="visibility:hidden"> </div>
+        </div>
     </div>
 
 </body>

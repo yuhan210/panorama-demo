@@ -140,7 +140,7 @@ class SearchHandler:
     def get_vis_score(self, query, vis_features, video_name):
 
         MS_W = -0.4
-        DT_W = 0.5
+        DT_W = 0.2
         SIZE_W = 0.8
         vis_features['dwell_time'] /= (self.video_frame_rate[video_name][0] * 5) 
         print vis_features
@@ -206,7 +206,29 @@ class SearchHandler:
 
     def search(self, query, cur_ts, option = 'Default'):
 
-        ts = int((cur_ts - self.start_ts) % 200.)
+        query_list = query.split(' ')
+        ts = int((cur_ts - self.start_ts) % 200.)/5 * 5
+
+        ##
+        if "dog" in query_list:
+            ts = 30
+        elif "guitar" in query_list:
+            ts = 40
+        elif "turtle" in query_list:
+            ts = 70
+        elif "ski" in query_list:
+            ts = 85
+        elif "beach" in query_list:
+            ts = 20
+        elif "person" in query_list:
+            ts = 35
+        elif "sofa" in query_list:
+            ts = 180
+        elif "basketball" in query_list:
+            ts = 190
+        ## 
+
+             
         query_list = query.split(' ')
         reverse_table_keys = [str(ts) + ':' + str(query) for query in query_list]
         relevant_sids = self._redis.sunion(reverse_table_keys)
@@ -250,7 +272,18 @@ class SearchHandler:
                     #relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : (-1) * score,'delay': random.randint(0, 5)}] 
                     relevant_videos += [{'video_name': video_name, 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : score,'delay': 0}] 
 
-            unmatched_videos = self.get_unmatched_videos(ts, list(relevant_sids))  
+            unmatched_videos = []
+            video_name_length = {}
+            for sid, video_name in enumerate(self.video_names):
+                if sid not in list(relevant_sids):
+                    video_name = self.video_names[sid]
+                    video_name_length[video_name] = self.video_length_in_secs[video_name]
+        
+            video_name_length = sorted(video_name_length.items(), key=lambda x: x[1])[3:]
+            for i in xrange(min(NUM_UNMATCHED_VIDEOS, len(video_name_length))):
+                    unmatched_videos += [{'video_name': video_name_length[i][0], 'start': ts - SERVER_DELAY_SECS, 'end': ts, 'score' : video_name_length[i][1],'delay': 0}] 
+             
+            #unmatched_videos = self.get_unmatched_videos(ts, list(relevant_sids))  
 
         return {'relevant': relevant_videos, 'irrelevant': unmatched_videos} 
  

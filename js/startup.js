@@ -22,114 +22,136 @@ function startPreview(){
 }
 
 function getVideoURL(video_name, start_time, end_time) {
-        return server_url + '/panorama-demo/videos/' + video_name + '.mp4#t=' + start_time
+        //return server_url + '/panorama-demo/video-snippets/' + video_name + '_' + start_time + '.mp4'
+        return 'http://elmo.csail.mit.edu/panorama-demo/videos/' + video_name + '.mp4#t=' + start_time
+
 }
 
 
-function play_video(relevant_start_videos, new_video_idx) {
-
-    var video_region_pos = $('#matched_video_region').offset();
-  
-    var j = 0;
-
-    for (var m = 0; m < relevant_video_num; ++m) {
-     
-        if (relevant_start_videos[m] > 0 || m == new_video_idx) {
-            row = parseInt(j/w_size);
-            col = parseInt(j%w_size);
-            var d = document.getElementById('relevant-' + m);
-            d.style.position = "absolute";
-            d.style.visibility = "visible";
-            d.style.top = video_region_pos['top'] + h_step * row;
-            d.style.left = 20 + w_step * col;  
-            j += 1;
-
-        }else if (relevant_start_videos[m] < 0) {
-
-            var d = document.getElementById('relevant-' + m);
-            d.style.position = "absolute";
-            d.style.visibility = "hidden";
-            var v = document.getElementById('relevant_video-' + m);  
-            v.pause();
-        }
-
-        if (m == new_video_idx) { 
-            var v = document.getElementById('relevant_video-' + m);  
-            v.play();
-        }
-
-    }
-}
-
-function start_delayed_play() {
-    console.log('start play');
-    var timer = setInterval(refresh, 1000);
-    var d = new Date();
-    var start_time = d.getTime();
-    function refresh() {
-        console.log('refresh');
-        console.log(relevant_start_videos);
-        var d = new Date();
-        var curtime = d.getTime();
-        var elapsed_time_s = (curtime - start_time)/1000;
-        for (var k = 0; k < relevant_video_num; ++k){
-          
-            var video_play_time = (curtime - relevant_start_videos[k])/1000;
-            var video_duration = relevant_dict[k]['end'] - relevant_dict[k]['start'];
-            console.log(video_play_time);
-            if (relevant_start_videos[k] > 0 && video_duration < video_play_time) {
-                relevant_start_videos[k] = -1;
-                play_video(relevant_start_videos, -1);
-            }
-
-            if (relevant_start_videos[k] == 0 && relevant_dict[k]['delay'] < elapsed_time_s) {
-                play_video(relevant_start_videos, k);
-                relevant_start_videos[k] = curtime;
-            }
-
-        }
-    }
-}
-
-function finished_loading(i, relevant_video_num) {
-    console.log('finished_loading:' + i);
+function relevant_finished_loading(i, relevant_video_num, query_str) {
+    console.log('finished_loading:' + i + ' finished:' + RELEVANT_LOADED_VIDEO_COUNT);
     RELEVANT_LOADED_VIDEO_COUNT += 1;
-    console.log(RELEVANT_LOADED_VIDEO_COUNT);
-    console.log(relevant_video_num);
+    //console.log(RELEVANT_LOADED_VIDEO_COUNT);
+    //console.log(relevant_video_num);
     if (RELEVANT_LOADED_VIDEO_COUNT == relevant_video_num) {
-        start_play(relevant_video_num);
+        console.log('finished loading relevant videos');
+        relevant_start_play(relevant_video_num, query_str);
     }
 }
-function start_play(relevant_video_num) {
-    var video_region_pos = $('#matched_video_region').offset();
-    document.getElementById('loading').style.visibility = 'hidden';
+
+function irrelevant_finished_loading(i, irrelevant_video_num) {
+    IRRELEVANT_LOADED_VIDEO_COUNT += 1;
+    if (IRRELEVANT_LOADED_VIDEO_COUNT == irrelevant_video_num) {
+        console.log('finished loading irrelevant videos');
+        irrelevant_start_play(irrelevant_video_num);
+    }
+}
+
+function irrelevant_start_play(irrelevant_video_num) {
+
+    var w = window.innerWidth;    
+    var h_step = 216; 
+    var region_div = document.getElementById('unmatched_video_region');
+    region_div.style.marginLeft = w * 11.5/24.0; 
+    region_div.style.width = w * 10/24.0;
+    region_div.style.border = "5px solid lightgray";
+    region_div.style.borderRadius = "13px";
+    region_div.style.padding = "45px 15px 15px";
+    region_div.style.height = irrelevant_video_num * h_step + 20;  
+    region_div.style.visibility = 'visible';  
+
+    var video_region_pos = $('#unmatched_video_region').offset();
+    var unmatched_region_text_div = document.getElementById('unmatched_video_text_region');
+    unmatched_region_text_div.innerHTML = '&nbsp;Irrelevant videos&nbsp;';
+    unmatched_region_text_div.style.visibility = 'visible';
 
     var w = window.innerWidth;    
     w = w - 20;
     var w_step = 300; 
     var h_step = 216; 
     var w_size =  parseInt(w/w_step);
+    for (i = 0; i < irrelevant_video_num;  ++i) { 
+        var top_pos = 60 + h_step * i; 
+        var left_pos = video_region_pos['left'] + 80;
+        var d = document.getElementById('irrelevant-' + i);
+        d.style.position = "absolute";
+        d.style.visibility = "visible";
+        d.style.top = top_pos;
+        d.style.left = left_pos;  
+        //var v = document.getElementById('irrelevant_video-' + i);  
+        //v.pause();
+    }
+}
+
+function relevant_start_play(relevant_video_num, query_str) {
+
+    var w = window.innerWidth;    
+    var h_step = 216; 
+    var matched_region_div = document.getElementById('matched_video_region');
+    matched_region_div.style.left = w * 4.5/24.0; 
+    matched_region_div.style.width = w * 10/24.0;
+    matched_region_div.style.border = "5px solid lightgray";
+    matched_region_div.style.borderRadius = "13px";
+    matched_region_div.style.padding = "45px 15px 15px";
+    matched_region_div.style.height = relevant_video_num * h_step + 20;  
+    matched_region_div.style.visibility = 'visible';  
+   
+  
+    var video_region_pos = $('#matched_video_region').offset();
+    document.getElementById('loading').style.visibility = 'hidden';
+
+    var matched_region_text_div = document.getElementById('matched_video_text_region');
+    if (relevant_video_num > 0) { 
+        matched_region_text_div.innerHTML = '&nbsp;Videos relevant to "' + query_str + '"&nbsp;';
+        matched_region_text_div.style.visibility = 'visible';
+    }
+
+    w = w - 20;
+    var w_step = 300; 
+    var h_step = 216; 
+    var w_size =  parseInt(w/w_step);
     for (i = 0; i < relevant_video_num;  ++i) { 
-        var row = parseInt(i/w_size);
-        var col = parseInt(i%w_size);
-        var top_pos = video_region_pos['top'] + h_step * row; 
-        var left_pos = 120 + w_step * col;
+        var top_pos = 60 + h_step * i; 
+        var left_pos = video_region_pos['left'] + 80;
         var d = document.getElementById('relevant-' + i);
         d.style.position = "absolute";
         d.style.visibility = "visible";
         d.style.top = top_pos;
         d.style.left = left_pos;  
-        var v = document.getElementById('relevant_video-' + i);  
-        v.play();
+        //var v = document.getElementById('relevant_video-' + i);  
+        //v.pause();
     }
 }
 
-function showVideos(relevant_dict, irrelevant_dict) {
+function playRelevantVideo(i) {
+    var v = document.getElementById('relevant_video-' + i);  
+    v.play();
+}
+
+function pauseRelevantVideo(i) {
+    var v = document.getElementById('relevant_video-' + i);  
+    v.pause();
+}
+
+
+function playIrrelevantVideo(i) {
+    var v = document.getElementById('irrelevant_video-' + i);  
+    v.play();
+}
+
+function pauseIrrelevantVideo(i) {
+    var v = document.getElementById('irrelevant_video-' + i);  
+    v.pause();
+}
+
+
+
+function showVideos(query_str, relevant_dict, irrelevant_dict) {
 
     var relevant_video_num = Math.min(relevant_dict.length, NUM_RELEVANT_VIDEOS);
     var irrelevant_video_num = Math.min(irrelevant_dict.length, NUM_IRRELEVANT_VIDEOS);
     RELEVANT_LOADED_VIDEO_COUNT = 0;
-
+    IRRELEVANT_LOADED_VIDEO_COUNT = 0;
               
     var w = window.innerWidth;    
     w = w - 20;
@@ -139,26 +161,30 @@ function showVideos(relevant_dict, irrelevant_dict) {
     var video_w = w_step - 10;
     var video_h = h_step - 10;
 
+	document.getElementById('loading').style.visibility = 'visible';
     /** Create div for each video and start load each video**/
-    var html_str = '';
-
+    var html_str = ''; 
+    var matched_region_text_div = document.getElementById('matched_video_text_region');
+    if (relevant_video_num == 0) { 
+        matched_region_text_div.innerHTML = '&nbsp;No videos matching "' + query_str +'"&nbsp;' ;
+        matched_region_text_div.style.visibility = 'visible';
+	    document.getElementById('loading').style.visibility = 'hidden';
+    }
     for (i = 0;  i < relevant_video_num ; ++i) {
 
-        html_str  += '<div id="relevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="relevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="finished_loading(' + i + ',' + relevant_video_num  + ')"> <source src ="' + getVideoURL(relevant_dict[i]['video_name'], relevant_dict[i]['start'], relevant_dict[i]['end']) + '" type="video/mp4"></video> </div>';
-
+        html_str  += '<div id="relevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="relevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="relevant_finished_loading(' + i + ',' + relevant_video_num  + ', \'' + query_str +  '\')"  onmouseover="playRelevantVideo(' + i + ')"  onmouseout="pauseRelevantVideo(' + i + ')"> <source src ="' + getVideoURL(relevant_dict[i]['video_name'], relevant_dict[i]['start'], relevant_dict[i]['end']) + '" type="video/mp4"></video> </div>';
     } 
-	document.getElementById('loading').style.visibility = 'visible';
+
 	$('#matched_video_region').html(html_str);
 
     var html_str = '';
+    for (i = 0; i < irrelevant_video_num && relevant_video_num > 0; ++i) {
 
-    for (i = 0;  i < irrelevant_video_num ; ++i) {
-
-        html_str  += '<div id="relevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="relevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="finished_loading(' + i + ',' + relevant_video_num  + ')"> <source src ="' + getVideoURL(relevant_dict[i]['video_name'], relevant_dict[i]['start'], relevant_dict[i]['end']) + '" type="video/mp4"></video> </div>';
+        html_str  += '<div id="irrelevant-' + i + '" style="position:absolute;  visibility:hidden;">' + '<video id="irrelevant_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false" oncanplay="irrelevant_finished_loading(' + i + ',' + irrelevant_video_num  + ')"  onmouseover="playIrrelevantVideo(' + i + ')"  onmouseout="pauseIrrelevantVideo(' + i + ')"> <source src ="' + getVideoURL(irrelevant_dict[i]['video_name'], irrelevant_dict[i]['start'], irrelevant_dict[i]['end']) + '" type="video/mp4"></video> </div>';
 
     } 
-	document.getElementById('loading').style.visibility = 'visible';
-	$('#matched_video_region').html(html_str);
+    $('#unmatched_video_region').html(html_str);
+
 }
 
 function reset(){
@@ -167,7 +193,6 @@ function reset(){
 
 function loadPreviewVideos(responseText){
 
-    console.log(responseText);
     var response_obj = JSON.parse(responseText); 
     var irrelevant_dict = response_obj['response']['irrelevant'];
     var relevant_dict = response_obj['response']['relevant'];
@@ -176,11 +201,12 @@ function loadPreviewVideos(responseText){
     var irrelevant_video_num = irrelevant_dict.length;
 
     var video_region_pos = $('#preview_video_region').offset();
-    var w = window.innerWidth;    
-    w = w - 20;
+    var w = $('#preview_video_region').width();    
+    w = w - 30;
     var w_step = 300; 
     var h_step = 216; 
-    var w_size = parseInt(w/w_step);
+    //var w_size = parseInt(w/w_step);
+    var w_size = 3;
     var video_w = w_step - 10;
     var video_h = h_step - 10;
 
@@ -211,7 +237,7 @@ function loadPreviewVideos(responseText){
         var row = parseInt(i/w_size);
         var col = parseInt(i%w_size);
         var top_pos = video_region_pos['top'] + h_step * row; 
-        var left_pos = 120 + w_step * col;
+        var left_pos = w * 0.15 + w_step * col;
         html_str  += '<div id="preview-' + i + '" style="position:absolute; top:' + top_pos + '; left:'+ left_pos +';">' + '<video id="preview_video-' +i + '" width="' + video_w + '" height="'+ video_h +'" controls muted preload="auto" autostart="false""> <source src ="' + getVideoURL(video_obj['video_name'], video_obj['start'], video_obj['start'] + 3) + '" type="video/mp4"></video> </div>';
         i += 1;
         selected_videos.push(video_obj['video_name']);
@@ -220,22 +246,27 @@ function loadPreviewVideos(responseText){
     
 }
 
-function processResponse(responseText){
+function processResponse(query_str, responseText){
 
     console.log(responseText);
     var response_obj = JSON.parse(responseText); 
     var irrelevant_dict = response_obj['response']['irrelevant'];
     var relevant_dict = response_obj['response']['relevant'];
-    showVideos(relevant_dict, irrelevant_dict); 
+    showVideos(query_str, relevant_dict, irrelevant_dict); 
 
 }
 
 function doSearch(){
 
-    query_str = document.getElementById('searchbox').value;
-    $('#panorama').html('Panorama -- ' + query_str); 
+    var query_str = document.getElementById('searchbox').value;
+    document.getElementById('matched_video_text_region').style.visibility = 'hidden';
+    document.getElementById('matched_video_region').style.visibility = 'hidden';
+    document.getElementById('unmatched_video_text_region').style.visibility = 'hidden';
+    document.getElementById('unmatched_video_region').style.visibility = 'hidden';
 	$('#loading').html('Searching live streams...');
     $('#preview_video_region').html('');
+    IRRELEVANT_LOADED_VIDEO_COUNT = 0;
+    RELEVANT_LOADED_VIDEO_COUNT = 0;
     postSearch(query_str, 0);
 
 }
@@ -251,7 +282,7 @@ function postSearch(query_str, isPreview = 1) {
                 if (isPreview == 1) {
                     loadPreviewVideos(xml_http.responseText); 
                 } else if (isPreview == 0) {
-                    processResponse(xml_http.responseText);
+                    processResponse(query_str, xml_http.responseText);
                 }
             } else if (xml_http.readyState == 4 && xml_http.status == 500){
 
